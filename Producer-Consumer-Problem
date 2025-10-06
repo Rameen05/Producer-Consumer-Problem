@@ -1,0 +1,86 @@
+#include <iostream>
+#include <pthread.h>
+#include <cstdlib>
+#include <unistd.h>
+
+using namespace std;
+
+int *buffer;           // circular buffer
+int buffersize;        // size of buffer
+int counter_limit;     // total number of produced/consumed items
+int in_index = 0;      // producer index
+int out_index = 0;     // consumer index
+int count = 0;         // current number of items in buffer
+int produced = 0;      // number of items produced so far
+int consumed = 0;      // number of items consumed so far
+
+// Producer thread
+void* producer(void* arg) {
+    while (produced < counter_limit) {
+        // Busy wait if buffer is full
+        while (count == buffersize) {
+            // spin-wait
+        }
+
+        int item = rand() % 100; // random number
+        buffer[in_index] = item;
+        in_index = (in_index + 1) % buffersize;
+        count++;
+        produced++;
+
+        cout << "Produced: " << item << " (count=" << produced << ")" << endl;
+        usleep(100000); // sleep 0.1s to slow output
+    }
+    pthread_exit(0);
+}
+
+// Consumer thread
+void* consumer(void* arg) {
+    while (consumed < counter_limit) {
+        // Busy wait if buffer is empty
+        while (count == 0) {
+            // spin-wait
+        }
+
+        int item = buffer[out_index];
+        out_index = (out_index + 1) % buffersize;
+        count--;
+        consumed++;
+
+        cout << "Consumed: " << item << " (count=" << consumed << ")" << endl;
+        usleep(150000); // sleep 0.15s to slow output
+    }
+    pthread_exit(0);
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 3) {
+        cerr << "Usage: " << argv[0] << " <buffersize> <counter_limit>" << endl;
+        return 1;
+    }
+
+    buffersize = atoi(argv[1]);
+    counter_limit = atoi(argv[2]);
+
+    if (buffersize <= 0 || counter_limit <= 0) {
+        cerr << "Both arguments must be positive integers." << endl;
+        return 1;
+    }
+
+    buffer = new int[buffersize]; // allocate buffer
+
+    pthread_t prod_thread, cons_thread;
+
+    // Create producer and consumer threads
+    pthread_create(&prod_thread, NULL, producer, NULL);
+    pthread_create(&cons_thread, NULL, consumer, NULL);
+
+    // Wait for threads to finish
+    pthread_join(prod_thread, NULL);
+    pthread_join(cons_thread, NULL);
+
+    cout << "Main: All items produced and consumed. Exiting." << endl;
+
+    delete[] buffer;
+    return 0;
+}
